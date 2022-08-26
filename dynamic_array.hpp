@@ -23,13 +23,14 @@ namespace lb {
         dynamic_array(){}
 
         dynamic_array(const dynamic_array<type>& T){
-            _nodes=T._nodes;
-            _size=T._size;
+            for(int i = 0; i < T.size(); i++){
+                push_back(T[i]);
+            }
             _space=T._space;
             _alloc_size=T._alloc_size;
         }
         dynamic_array(dynamic_array<type>&& T){
-            _nodes=T._nodes;
+            _nodes=std::move(T._nodes);
             _size=T._size;
             _space=T._space;
             _alloc_size=T._alloc_size;
@@ -41,15 +42,16 @@ namespace lb {
         }
         dynamic_array<type>& operator=(const dynamic_array<type>& T){
             clear();
-            _nodes=T._nodes;
-            _size=T._size;
+            for(int i = 0; i < T.size(); i++){
+                push_back(T[i]);
+            }
             _space=T._space;
             _alloc_size=T._alloc_size;
             return *this;
         }
         dynamic_array<type>& operator=(dynamic_array<type>&& T){
             clear();
-            _nodes=T._nodes;
+            _nodes=std::move(T._nodes);
             _size=T._size;
             _space=T._space;
             _alloc_size=T._alloc_size;
