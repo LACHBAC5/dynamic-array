@@ -22,7 +22,7 @@ namespace lb {
         public:
         dynamic_array(){}
 
-        dynamic_array(const dynamic_array<type>& T){
+        dynamic_array(dynamic_array<type>& T){
             for(int i = 0; i < T.size(); i++){
                 push_back(T[i]);
             }
@@ -40,7 +40,7 @@ namespace lb {
                 push_back(*i);
             }
         }
-        dynamic_array<type>& operator=(const dynamic_array<type>& T){
+        dynamic_array<type>& operator=(dynamic_array<type>& T){
             clear();
             for(int i = 0; i < T.size(); i++){
                 push_back(T[i]);
@@ -57,7 +57,7 @@ namespace lb {
             _alloc_size=T._alloc_size;
             return *this;
         }
-        dynamic_array<type>& operator=(const std::initializer_list<type>& T){
+        dynamic_array<type>& operator=(std::initializer_list<type>& T){
             clear();
             for(auto i = T.begin(); i != T.end(); i++){
                 push_back(*i);
@@ -77,23 +77,15 @@ namespace lb {
         }
 
         type& operator[](int pos){
-            int index=pos/_space, offset=pos%_space;
-            nodeptr<type> first = _nodes[index];
-            int r = _nodes[index]._current->_size-_nodes[index]._offset;
-            if(r<=offset){
-                offset-=r;
-                node<type>* buffer=first._current;
+            int index1=pos/_space, offset=pos%_space+_nodes[index1]._offset;
+            nodeptr<type> first = _nodes[index1]; node<type>* buffer;
+            while(first._current->_size<=offset){
+                offset-=first._current->_size;
+                buffer=first._current;
                 first._current=XOR(first._prev, first._current->_xnp);
                 first._prev=buffer;
-                first._offset=0;
-                while(first._current->_size<=offset){
-                    offset-=first._current->_size;
-                    buffer=first._current;
-                    first._current=XOR(first._prev, first._current->_xnp);
-                    first._prev=buffer;
-                }
             }
-            return *(first._current->_array+first._offset+offset);
+            return *(first._current->_array+offset);
         }
 
         // prepare memory for read/write 
@@ -179,7 +171,97 @@ namespace lb {
             // update size
             _size++;
         }
-        void insert(int start);
+        void insert(int pos, const type& value){
+            int index1=pos/_space, offset1=pos%_space+_nodes[index1]._offset;
+            nodeptr<type> first = _nodes[index1]; node<type>* buffer;
+            while(first._current->_size<=offset1){
+                offset1-=first._current->_size;
+                buffer=first._current;
+                first._current=XOR(first._prev, first._current->_xnp);
+                first._prev=buffer;
+            }
+            type* narray=new type[first._current->_size+1]; bool offset2=0;
+            for(int i = 0; i < first._current->_size+1; i++){
+                if(i==offset1){
+                    *(narray+i)=value;
+                    offset2=1;
+                    continue;
+                }
+                *(narray+i)=*(first._current->_array+i-offset2);
+            }
+            delete[] first._current->_array;
+            first._current->_array=narray;
+            first._current->_size++;
+            _size++;
+        }
+
+        void insert(int pos, dynamic_array<type>& values, int start, int end){
+            // make a copy of the values
+            dynamic_array<type> ndarray; ndarray.prep_flags();
+            for(int i = start; i <= end; i++){
+                ndarray.push_back(values[i]);
+            }
+            
+            // find node
+            int index1=pos/_space, offset1=pos%_space+_nodes[index1]._offset;
+            nodeptr<type> first = _nodes[index1]; node<type>* buffer;
+            while(first._current->_size<=offset1){
+                offset1-=first._current->_size;
+                buffer=first._current;
+                first._current=XOR(first._prev, first._current->_xnp);
+                first._prev=buffer;
+            }
+
+            // gen new arrays
+            type* lnarray = new type[offset1];
+            for(int i = 0; i < offset1; i++){
+                *(lnarray+i)=*(first._current->_array+i);
+            }
+
+            int rnarray_size_1=first._current->_size-offset1;
+            int rnarray_size_2=ndarray._nodes[ndarray._nodes.size()-1]._offset;
+            type* rnarray = new type[rnarray_size_1+rnarray_size_2];
+            for(int i = 0; i < rnarray_size_2; i++){
+                *(rnarray+i)=*(ndarray._nodes[ndarray._nodes.size()-1]._current->_array+i);
+            }
+            for(int i = 0; i < rnarray_size_1; i++){
+                *(rnarray+ndarray._nodes[ndarray._nodes.size()-1]._offset+i)=*(first._current->_array+offset1+i);
+            }
+
+    
+            // delete and update larray
+            delete[] first._current->_array;
+            first._current->_size=offset1;
+            first._current->_array=lnarray;
+
+            // delete and update larray
+            delete[] ndarray._nodes[ndarray._nodes.size()-1]._current->_array;
+            ndarray._nodes[ndarray._nodes.size()-1]._current->_array=rnarray;
+            ndarray._nodes[ndarray._nodes.size()-1]._current->_size=rnarray_size_1+rnarray_size_2;
+
+            /*
+            for(int i = 0; i < first._current->_size; i++){
+                std::cout << first._current->_array[i] << '\n';
+            }
+            for(int i = 0; i < rnarray_size_1+rnarray_size_2; i++){
+                std::cout << *(ndarray._nodes[ndarray._nodes.size()-1]._current->_array+i) << '\n';
+            }
+            */
+            
+            // link
+            node<type>* second=XOR(first._prev, first._current->_xnp);
+            if(second!=nullptr){
+                second->_xnp=XOR(ndarray._nodes[ndarray._nodes.size()-1]._current, XOR(first._current, second->_xnp));
+            }
+            first._current->_xnp=XOR(first._prev, ndarray._nodes[0]._current);
+
+            ndarray._nodes[0]._current->_xnp=XOR(first._current, XOR(nullptr, ndarray._nodes[0]._current->_xnp));
+            ndarray._nodes[0]._prev=first._current;
+            ndarray._nodes[ndarray._nodes.size()-1]._current->_xnp=XOR(XOR(ndarray._nodes[ndarray._nodes.size()-1]._current->_xnp, nullptr), second);
+
+            ndarray._nodes[0]._current=nullptr;
+            _size+=end-start+1;
+        }
 
         void pop_back(){
             nodeptr<type>* pnode = &_nodes[_nodes.size()-1];
@@ -197,38 +279,23 @@ namespace lb {
         }
         void erase(int start, int end){
             // get logical offsets
-            int index1=start/_space, offset1=start%_space;
-            int index2=end/_space, offset2=end%_space;
+            int index1=start/_space, offset1=start%_space+_nodes[index1]._offset;
+            int index2=end/_space, offset2=end%_space+_nodes[index2]._offset;
 
             // get actual offsets
             nodeptr<type> first=_nodes[index1], second=_nodes[index2];
-            int r = _nodes[index1]._current->_size-_nodes[index1]._offset;
-            if(r<=offset1){
-                offset1-=r;
-                node<type>* buffer=first._current;
+            node<type>* buffer;
+            while(first._current->_size<=offset1){
+                offset1-=first._current->_size;
+                buffer=first._current;
                 first._current=XOR(first._prev, first._current->_xnp);
                 first._prev=buffer;
-                first._offset=0;
-                while(first._current->_size<=offset1){
-                    offset1-=first._current->_size;
-                    buffer=first._current;
-                    first._current=XOR(first._prev, first._current->_xnp);
-                    first._prev=buffer;
-                }
-            }
-            r = _nodes[index2]._current->_size-_nodes[index2]._offset;
-            if(r<=offset2){
-                offset2-=r;
-                node<type>* buffer=second._current;
+            }            
+            while(second._current->_size<=offset2){
+                offset2-=second._current->_size;
+                buffer=second._current;
                 second._current=XOR(second._prev, second._current->_xnp);
                 second._prev=buffer;
-                second._offset=0;
-                while(second._current->_size<=offset2){
-                    offset2-=second._current->_size;
-                    buffer=second._current;
-                    second._current=XOR(second._prev, second._current->_xnp);
-                    second._prev=buffer;
-                }
             }
 
             // allocate new array
@@ -249,7 +316,7 @@ namespace lb {
             delete[] first._current->_array;
             first._current->_array=narray;
             first._current->_size=narray_size;
-            node<type>* buffer = XOR(second._prev, second._current->_xnp);
+            buffer = XOR(second._prev, second._current->_xnp);
             first._current->_xnp=XOR(first._prev, buffer);
             if(buffer!=nullptr){
                 buffer->_xnp=XOR(first._current, XOR(second._current, buffer->_xnp));
