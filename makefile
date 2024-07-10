@@ -1,9 +1,9 @@
 all: main.out test.out
 
-main.out: main.o dynamic-array.o
+main.out: main.o
 	g++ -o $@ $^
 
-test.out: test.o dynamic-array.o
+test.out: test.o
 	g++ -o $@ $^
 
 %.o: %.cpp

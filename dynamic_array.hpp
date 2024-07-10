@@ -3,6 +3,8 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <cstdint>
+
 namespace lb {
     template<typename type>
     struct node{

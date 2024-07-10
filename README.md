@@ -14,4 +14,8 @@ running *make* compiles main.cpp and test.cpp.
 
 **info**
 
-It is implemented as a xor linked list, where each node holds an array.
+It is implemented as a xor linked list, where each node holds an array.\
+The more nodes with smaller arrays the less time erasing and inserting consume and the more time indexing consumes\
+the less nodes with bigger  arrays the more time erasing and inserting consume and the less time indexing consumes\
+
+Run test.out for comparison between the data type and std::vector
